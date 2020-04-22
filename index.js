@@ -248,7 +248,7 @@ var UI;
                 });
             });
             //horizontal sort
-            [leftBank, rightBank].forEach(function (bank) {
+            [topBank, bottomBank].forEach(function (bank) {
                 bank.sort(function (a, b) {
                     if (a.pt.x < b.pt.x)
                         return -1;
@@ -292,8 +292,8 @@ var UI;
             this._blocks = [];
             this._arrowsObjCol = [];
             this.createLayer('background');
-            this._layerBlock = this.createLayer('layerBlock');
             this._layerWire = this.createLayer('layerWire');
+            this._layerBlock = this.createLayer('layerBlock');
             this._mouseMode = MouseMode.moveBlock;
             this.attachBlockEvents();
         }
@@ -407,3 +407,4 @@ function getBlock(color) {
 }
 fd.addBlock(getBlock());
 fd.addBlock(getBlock('yellow'));
+fd.addBlock(getBlock("blue"));

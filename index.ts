@@ -347,7 +347,7 @@ namespace UI
             });
 
             //horizontal sort
-            [leftBank, rightBank].forEach(bank =>
+            [topBank, bottomBank].forEach(bank =>
             {
                 bank.sort((a, b) =>
                 {
@@ -426,8 +426,8 @@ namespace UI
 
             this.createLayer('background');
 
-            this._layerBlock = this.createLayer('layerBlock');
             this._layerWire = this.createLayer('layerWire');
+            this._layerBlock = this.createLayer('layerBlock');
             this._mouseMode = MouseMode.moveBlock;
 
             this.attachBlockEvents();
@@ -584,4 +584,5 @@ function getBlock(color: string = 'red')
 
 fd.addBlock(getBlock());
 fd.addBlock(getBlock('yellow'));
+fd.addBlock(getBlock("blue"));
 
