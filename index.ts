@@ -97,6 +97,14 @@ namespace UI
                 seg2: ub >= 0 && ub <= 1
             };
         }
+
+        export function avgPoint(points: Point[])
+        {
+            let x1 = 0;
+            let y1 = 0;
+            points.forEach(pt => { x1 += pt.x, y1 += pt.y });
+            return new Point(x1 / points.length, y1 / points.length);
+        }
     }
 
     export interface FlowDiagramArg 
@@ -115,6 +123,11 @@ namespace UI
         private _fromPoint: Drawing.Point;
         private _toPoint: Drawing.Point;
 
+        private line1: SVGLineElement;
+        private line2: SVGLineElement;
+        private line3: SVGLineElement;
+        private text: SVGTextElement;
+
         constructor(from: FlowBlock, to: FlowBlock)
         {
             this.fromBlock = from;
@@ -122,7 +135,14 @@ namespace UI
             let line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             let line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             let line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            this.graphics = [line1, line2, line3];
+            let text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+
+            this.line1 = line1;
+            this.line2 = line2;
+            this.line3 = line3;
+            this.text = text;
+
+            this.graphics = [line1, line2, line3, text];
             this.graphics.forEach(line =>
             {
                 line.style.stroke = 'red';
@@ -154,36 +174,45 @@ namespace UI
             let fromY: number = this._fromPoint.y;
             let toX: number = this._toPoint.x;
             let toY: number = this._toPoint.y;
-
             let toDirectAngle: number = Math.atan2(fromY - toY, fromX - toX);
-            let line1 = this.graphics[0];
-            let line2 = this.graphics[1];
-            let line3 = this.graphics[2];
 
+
+            this._render_draw_arrow(fromX, fromY, toX, toY, toDirectAngle);
+
+            let text = this.text;
+            let lineCenter = Drawing.avgPoint([this._fromPoint, this._toPoint]);
+
+            text.style.textAnchor = 'middle';
+            text.textContent = 'Arrow';
+            text.style.stroke='none';
+            let angleDeg = toDirectAngle / Math.PI * 180;
+            if (angleDeg < -90) angleDeg += 180;
+            else if (angleDeg > 90) angleDeg -= 180;
+            text.style.transform = `translate(${lineCenter.x}px, ${lineCenter.y}px) rotate(${angleDeg}deg) translate(0,-5px)`;
+
+        }
+
+        private _render_draw_arrow(fromX: number, fromY: number, toX: number, toY: number, toDirectAngle: number)
+        {
+            let line1 = this.line1;
+            let line2 = this.line2;
+            let line3 = this.line3;
             line1.x1.baseVal.value = fromX;
             line1.y1.baseVal.value = fromY;
-
             line1.x2.baseVal.value = toX;
             line1.y2.baseVal.value = toY;
-
             let x2: number = 0, y2: number = 0, x3: number = 0, y3: number = 0;
             let delAngle = 30 / 180 * Math.PI;
-
-            x2 = Math.cos(toDirectAngle - delAngle) * 5;
-            y2 = Math.sin(toDirectAngle - delAngle) * 5;
-
-            x3 = Math.cos(toDirectAngle + delAngle) * 5;
-            y3 = Math.sin(toDirectAngle + delAngle) * 5;
-
+            x2 = Math.cos(toDirectAngle - delAngle) * 10;
+            y2 = Math.sin(toDirectAngle - delAngle) * 10;
+            x3 = Math.cos(toDirectAngle + delAngle) * 10;
+            y3 = Math.sin(toDirectAngle + delAngle) * 10;
             line2.x1.baseVal.value = x2 + toX;
             line2.y1.baseVal.value = y2 + toY;
-
             line2.x2.baseVal.value = toX;
             line2.y2.baseVal.value = toY;
-
             line3.x1.baseVal.value = x3 + toX;
             line3.y1.baseVal.value = y3 + toY;
-
             line3.x2.baseVal.value = toX;
             line3.y2.baseVal.value = toY;
         }
@@ -272,7 +301,7 @@ namespace UI
 
             [leftBank, rightBank, topBank, bottomBank].forEach((bank, i) =>
             {
-                let halfLength = (bank.length-1) * seperator / 2;
+                let halfLength = (bank.length - 1) * seperator / 2;
                 let fpti = ptindex[i];
                 let pti = 0;
 
@@ -494,7 +523,7 @@ namespace UI
                     else if (selBlock && selBlock != selectedBlock)
                     {
                         this.addArrow(selectedBlock, selBlock);
-                        selectedBlock=null;
+                        selectedBlock = null;
                     }
                     else
                     {
