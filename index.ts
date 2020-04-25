@@ -4,7 +4,7 @@ namespace UI
     let mouseY: number = 0;
     let selectedBlockX: number = 0;
     let selectedBlockY: number = 0;
-    let selectedBlock: FlowBlock | null;
+    let selectable: FlowBlock | FlowArrow | null;
 
     export enum MouseMode
     {
@@ -107,14 +107,32 @@ namespace UI
         }
     }
 
-    export interface FlowDiagramArg 
+    interface IPropertyDescriptor
     {
-        targetElement: HTMLElement | null | undefined;
-        width: number;
-        height: number;
+        name: string;
+        type: "string" | "number";
+
+        onGet: () => any;
+        onSet: (value: any) => void;
     }
 
-    export class FlowArrow
+    interface ISelectable
+    {
+        onSelect: Function;
+        onUnselect: Function;
+
+        getPropertyList: () => IPropertyDescriptor[];
+    }
+
+    export interface FlowDiagramArg 
+    {
+        width: string;
+        height: string;
+        targetElement?: HTMLElement;
+        propEditor?: HTMLElement;
+    }
+
+    export class FlowArrow implements ISelectable
     {
         fromBlock: FlowBlock;
         toBlock: FlowBlock;
@@ -137,18 +155,21 @@ namespace UI
             let line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             let text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 
+            text.style.textAnchor = 'middle';
+
             this.line1 = line1;
             this.line2 = line2;
             this.line3 = line3;
             this.text = text;
 
-            this.graphics = [line1, line2, line3, text];
-            this.graphics.forEach(line =>
+            [line1, line2, line3].forEach(line =>
             {
                 line.style.stroke = 'red';
                 line.style.strokeWidth = '2px';
+                (line as any).myhandler = this;
             });
 
+            this.graphics = [line1, line2, line3, text];
             this._fromPoint = new Drawing.Point(0, 0);
             this._toPoint = new Drawing.Point(0, 0);
         }
@@ -176,20 +197,15 @@ namespace UI
             let toY: number = this._toPoint.y;
             let toDirectAngle: number = Math.atan2(fromY - toY, fromX - toX);
 
-
             this._render_draw_arrow(fromX, fromY, toX, toY, toDirectAngle);
 
             let text = this.text;
             let lineCenter = Drawing.avgPoint([this._fromPoint, this._toPoint]);
 
-            text.style.textAnchor = 'middle';
-            text.textContent = 'Arrow';
-            text.style.stroke='none';
             let angleDeg = toDirectAngle / Math.PI * 180;
             if (angleDeg < -90) angleDeg += 180;
             else if (angleDeg > 90) angleDeg -= 180;
             text.style.transform = `translate(${lineCenter.x}px, ${lineCenter.y}px) rotate(${angleDeg}deg) translate(0,-5px)`;
-
         }
 
         private _render_draw_arrow(fromX: number, fromY: number, toX: number, toY: number, toDirectAngle: number)
@@ -221,9 +237,29 @@ namespace UI
         {
             return new Drawing.LineSeg(this.fromBlock.center, this.toBlock.center);
         }
+
+        onSelect()
+        {
+            [this.line1, this.line2, this.line3].forEach(line => { line.style.stroke = 'blue'; });
+        }
+
+        onUnselect()
+        {
+            [this.line1, this.line2, this.line3].forEach(line => { line.style.stroke = 'black'; });
+        }
+
+        getPropertyList(): IPropertyDescriptor[]
+        {
+            return [{
+                name: "Primary Text",
+                type: 'string',
+                onGet: () => { return this.text.textContent },
+                onSet: (value: any) => { this.text.textContent = value }
+            }];
+        }
     }
 
-    export class FlowBlock
+    export class FlowBlock implements ISelectable
     {
         origin: Drawing.Point;
         size: Drawing.Point;
@@ -234,7 +270,7 @@ namespace UI
         borders: Drawing.LineSeg[];
         center: Drawing.Point;
 
-        constructor(x: number, y: number, w: number, h: number, graphic: SVGGElement)
+        constructor(x: number, y: number, w: number, h: number, graphic: SVGGElement, clickable: SVGElementInstance[] = [])
         {
             this.origin = new Drawing.Point(x, y);
             this.size = new Drawing.Point(w, h);
@@ -244,6 +280,12 @@ namespace UI
 
             this.arrows = [];
             this.graphic = graphic;
+
+            clickable.forEach(ele =>
+            {
+                let obj = ele as any;
+                obj.myhandler = this;
+            })
         }
 
         pointLiesInBlock(x: number, y: number)
@@ -286,7 +328,7 @@ namespace UI
             return Arrow1
         }
 
-        private _renderArrows(sender : FlowBlock = this)
+        private _renderArrows(sender: FlowBlock = this)
         {
             if (this.arrows.length === 0) return;
             let { bottomBank, leftBank, rightBank, topBank } = this._getArrowBanks();
@@ -330,15 +372,14 @@ namespace UI
                     }
 
                     iter.Arrow.setPt(dpt, this);
-                    
-                    if(sender === this)
+
+                    if (sender === this)
                     {
                         let otherBlock = iter.Arrow.fromBlock;
-                        if(otherBlock===this)otherBlock = iter.Arrow.toBlock;
+                        if (otherBlock === this) otherBlock = iter.Arrow.toBlock;
                         otherBlock._renderArrows(this);
                     }
-                    
-                    
+
                     pti += seperator;
                 });
             });
@@ -436,6 +477,18 @@ namespace UI
 
             return ret;
         }
+
+        onSelect()
+        {
+
+        }
+
+        onUnselect()
+        {
+
+        }
+
+        getPropertyList() { return [] };
     }
 
     export class FlowDiagram
@@ -450,14 +503,18 @@ namespace UI
         private _arrowsObjCol: FlowArrow[];
         _mouseMode: MouseMode;
 
+        private _arg: FlowDiagramArg;
+
         constructor(arg: FlowDiagramArg)
         {
+            this._arg = arg;
             this.rootSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 
             if (arg.targetElement)
                 arg.targetElement.appendChild(this.rootSVG);
-            this.rootSVG.setAttribute('width', arg.width + 'px');
-            this.rootSVG.setAttribute('height', arg.height + 'px');
+            
+            arg.width?this.rootSVG.setAttribute('width', arg.width):null;
+            arg.height?this.rootSVG.setAttribute('height', arg.height):null;
             this._map_namedLayer = {};
             this._blocks = [];
             this._arrowsObjCol = [];
@@ -498,45 +555,87 @@ namespace UI
         {
             this.rootSVG.onmousedown = e =>
             {
-                if (this._mouseMode === MouseMode.moveBlock)
-                {
-                    mouseX = e.x;
-                    mouseY = e.y;
+                let prevSelected = selectable;
+                let eleInQuestion = e.target as any;
 
-                    selectedBlock = null;
-                    this._blocks.forEach(blk =>
+                if (eleInQuestion.myhandler)
+                {
+                    let handlerObject = eleInQuestion.myhandler;
+                    if (handlerObject instanceof FlowBlock)
                     {
-                        if (blk.pointLiesInBlock(mouseX, mouseY))
+                        debugger;
+                        if (this._mouseMode === MouseMode.moveBlock)
                         {
-                            selectedBlock = blk;
+                            mouseX = e.x;
+                            mouseY = e.y;
+                            selectable = null;
+                            let blk = handlerObject;
+                            selectable = blk;
                             selectedBlockX = blk.origin.x;
                             selectedBlockY = blk.origin.y;
                         }
-                    });
-                }
-                else if (this._mouseMode === MouseMode.addArrows)
-                {
-                    let selBlock: FlowBlock | null = null;
-                    this._blocks.forEach(blk =>
-                    {
-                        if (blk.pointLiesInBlock(e.x, e.y))
+                        else if (this._mouseMode === MouseMode.addArrows)
                         {
-                            selBlock = blk;
-                        }
-                    });
+                            let selBlock: FlowBlock = handlerObject;
 
-                    if (selectedBlock === null)
-                    {
-                        selectedBlock = selBlock;
+                            if (selectable === null)
+                            {
+                                selectable = selBlock;
+                            }
+                            else if (selBlock && selBlock != selectable && selectable instanceof FlowBlock)
+                            {
+                                this.addArrow(selectable, selBlock);
+                                selectable = null;
+                            }
+                            else
+                            {
+                                selectable = selBlock;
+                            }
+                        }
                     }
-                    else if (selBlock && selBlock != selectedBlock)
+
+                    if (handlerObject instanceof FlowArrow)
                     {
-                        this.addArrow(selectedBlock, selBlock);
-                        selectedBlock = null;
+                        selectable = eleInQuestion.myhandler;
                     }
-                    else
+                }
+                else
+                {
+                    selectable = null;
+                }
+
+                if (selectable !== prevSelected)
+                {
+                    prevSelected?.onUnselect();
+                    selectable?.onSelect();
+
+                    if (this._arg.propEditor)
                     {
-                        selectedBlock = selBlock;
+                        while(this._arg.propEditor.firstElementChild)
+                        {
+                            this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
+                        }
+
+                        let props = selectable?.getPropertyList();
+                        props?.forEach(prop =>
+                        {
+                            let div = document.createElement('div');
+                            let label = document.createElement('label');
+                            let inp = document.createElement('input');
+                            let txt = document.createTextNode(prop.name);
+
+                            div.appendChild(label);
+                            label.appendChild(txt);
+                            label.appendChild(inp);
+
+                            inp.onchange = () =>
+                            {
+                                prop.onSet(inp.value);
+                            }
+                            inp.value = prop.onGet();
+
+                            this._arg.propEditor?.appendChild(div);
+                        });
                     }
                 }
             }
@@ -545,14 +644,14 @@ namespace UI
             {
                 if (this._mouseMode === MouseMode.moveBlock)
                 {
-                    if (e.buttons === 1 && e.button === 0 && selectedBlock)
+                    if (e.buttons === 1 && e.button === 0 && selectable instanceof FlowBlock)
                     {
                         let dx = e.x - mouseX;
                         let dy = e.y - mouseY;
-                        selectedBlock.origin.x = selectedBlockX + dx;
-                        selectedBlock.origin.y = selectedBlockY + dy;
+                        selectable.origin.x = selectedBlockX + dx;
+                        selectable.origin.y = selectedBlockY + dy;
 
-                        selectedBlock.render();
+                        selectable.render();
                     }
                 }
                 else if (this._mouseMode === MouseMode.addArrows)
@@ -578,12 +677,15 @@ namespace UI
 }
 
 let fd = new UI.FlowDiagram({
-    width: 1000,
-    height: 1000,
-    targetElement: document.getElementById('target')
+    width:'100%',
+    height:'100%',
+    targetElement: document.getElementById('target') || undefined,
+    propEditor: document.getElementById('propeditor') || undefined
 });
 
 fd.rootSVG.style.border = '1px solid black';
+fd.rootSVG.style.width='100%';
+fd.rootSVG.style.height='100%';
 
 let button1 = document.getElementById('sw');
 if (button1)
@@ -602,7 +704,7 @@ if (button1)
     }
 }
 
-function getBlock(color: string = 'red')
+function getBlock(color: string = '#00000000')
 {
     let block = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
     let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -617,10 +719,11 @@ function getBlock(color: string = 'red')
     rect.x.baseVal.value = 10;
     rect.y.baseVal.value = 10;
 
-    return new UI.FlowBlock(0, 0, 120, 120, block);
+    return new UI.FlowBlock(0, 0, 120, 120, block, [rect]);
 }
 
 fd.addBlock(getBlock());
-fd.addBlock(getBlock('yellow'));
-fd.addBlock(getBlock("blue"));
+fd.addBlock(getBlock('red'));
+fd.addBlock(getBlock('blue'));
+
 
