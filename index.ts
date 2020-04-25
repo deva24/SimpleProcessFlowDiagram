@@ -286,7 +286,7 @@ namespace UI
             return Arrow1
         }
 
-        private _renderArrows()
+        private _renderArrows(sender : FlowBlock = this)
         {
             if (this.arrows.length === 0) return;
             let { bottomBank, leftBank, rightBank, topBank } = this._getArrowBanks();
@@ -330,6 +330,15 @@ namespace UI
                     }
 
                     iter.Arrow.setPt(dpt, this);
+                    
+                    if(sender === this)
+                    {
+                        let otherBlock = iter.Arrow.fromBlock;
+                        if(otherBlock===this)otherBlock = iter.Arrow.toBlock;
+                        otherBlock._renderArrows(this);
+                    }
+                    
+                    
                     pti += seperator;
                 });
             });
