@@ -270,10 +270,15 @@ namespace UI
         borders: Drawing.LineSeg[];
         center: Drawing.Point;
 
-        private _props:IPropertyDescriptor[];
+        private _props: IPropertyDescriptor[];
 
-        constructor(x: number, y: number, w: number, h: number, graphic: SVGGElement, clickable: SVGElementInstance[] = [], props: IPropertyDescriptor[] = [])
+        constructor()
         {
+            let x: number = 0;
+            let y: number = 0;
+            let w: number = 120;
+            let h: number = 120;
+
             this.origin = new Drawing.Point(x, y);
             this.size = new Drawing.Point(w, h);
 
@@ -281,15 +286,50 @@ namespace UI
             this.center = this._getCenter();
 
             this.arrows = [];
-            this.graphic = graphic;
+            this._props = [];
 
-            clickable.forEach(ele =>
+            let block = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
+            this.graphic = block;
+            this._setGraphic();
+        }
+
+        private _setGraphic()
+        {
+            let block = this.graphic;
+            let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            block.appendChild(rect);
+
+            rect.width.baseVal.value = 100;
+            rect.height.baseVal.value = 100;
+
+            rect.style.fill = '#FFFFFF';
+            rect.style.stroke = 'black';
+            rect.style.strokeWidth = '1';
+            rect.x.baseVal.value = 10;
+            rect.y.baseVal.value = 10;
+
+            let txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            block.appendChild(txt);
+            txt.setAttribute('x', '60px');
+            txt.setAttribute('y', '60px');
+            txt.style.textAnchor = 'middle';
+            txt.style.dominantBaseline = 'middle';
+
+            //set clickable
+            [rect].forEach(ele =>
             {
                 let obj = ele as any;
                 obj.myhandler = this;
             })
 
-            this._props = props;
+            this._props = [
+                {
+                    name: "Primary text",
+                    type: 'string',
+                    onGet: () => { return txt.textContent },
+                    onSet: (val: any) => { txt.textContent = val; }
+                }
+            ]
         }
 
         pointLiesInBlock(x: number, y: number)
@@ -505,7 +545,7 @@ namespace UI
 
         private _blocks: FlowBlock[];
         private _arrowsObjCol: FlowArrow[];
-        _mouseMode: MouseMode;
+        private _mouseMode: MouseMode;
 
         private _arg: FlowDiagramArg;
 
@@ -548,18 +588,10 @@ namespace UI
             return group;
         }
 
-        addBlock(block: FlowBlock)
-        {
-            this._blocks.push(block);
-            this._layerBlock.appendChild(block.graphic);
-            block.render();
-        }
-
         private attachBlockEvents()
         {
             this.rootSVG.onmousedown = e =>
             {
-                let prevSelected = selectable;
                 let eleInQuestion = e.target as any;
 
                 if (eleInQuestion.myhandler)
@@ -567,14 +599,12 @@ namespace UI
                     let handlerObject = eleInQuestion.myhandler;
                     if (handlerObject instanceof FlowBlock)
                     {
-                        debugger;
                         if (this._mouseMode === MouseMode.moveBlock)
                         {
                             mouseX = e.x;
                             mouseY = e.y;
-                            selectable = null;
                             let blk = handlerObject;
-                            selectable = blk;
+                            this.setSelection(blk);
                             selectedBlockX = blk.origin.x;
                             selectedBlockY = blk.origin.y;
                         }
@@ -584,64 +614,30 @@ namespace UI
 
                             if (selectable === null)
                             {
-                                selectable = selBlock;
+                                this.setSelection(selBlock);
                             }
                             else if (selBlock && selBlock != selectable && selectable instanceof FlowBlock)
                             {
                                 this.addArrow(selectable, selBlock);
-                                selectable = null;
+                                this.setSelection(null);
                             }
                             else
                             {
-                                selectable = selBlock;
+                                this.setSelection(selBlock);
                             }
                         }
                     }
 
                     if (handlerObject instanceof FlowArrow)
                     {
-                        selectable = eleInQuestion.myhandler;
+                        this.setSelection(eleInQuestion.myhandler);
                     }
                 }
                 else
                 {
-                    selectable = null;
+                    this.setSelection(null);
                 }
 
-                if (selectable !== prevSelected)
-                {
-                    prevSelected?.onUnselect();
-                    selectable?.onSelect();
-
-                    if (this._arg.propEditor)
-                    {
-                        while (this._arg.propEditor.firstElementChild)
-                        {
-                            this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
-                        }
-
-                        let props = selectable?.getPropertyList();
-                        props?.forEach(prop =>
-                        {
-                            let div = document.createElement('div');
-                            let label = document.createElement('label');
-                            let inp = document.createElement('input');
-                            let txt = document.createTextNode(prop.name);
-
-                            div.appendChild(label);
-                            label.appendChild(txt);
-                            label.appendChild(inp);
-
-                            inp.onchange = () =>
-                            {
-                                prop.onSet(inp.value);
-                            }
-                            inp.value = prop.onGet();
-
-                            this._arg.propEditor?.appendChild(div);
-                        });
-                    }
-                }
             }
 
             this.rootSVG.onmousemove = e =>
@@ -652,10 +648,31 @@ namespace UI
                     {
                         let dx = e.x - mouseX;
                         let dy = e.y - mouseY;
-                        selectable.origin.x = selectedBlockX + dx;
-                        selectable.origin.y = selectedBlockY + dy;
 
-                        selectable.render();
+                        let nx = selectedBlockX + dx;
+                        let ny = selectedBlockY + dy;
+
+                        let hx = selectable.size.x / 2;
+                        let hy = selectable.size.y / 2;
+
+                        let cx = nx + hx;
+                        let cy = ny + hy;
+
+                        let rounding = 10;
+
+                        let rx = cx - Math.round(cx / rounding) * rounding;
+                        let ry = cy - Math.round(cy / rounding) * rounding;
+
+                        nx -= rx;
+                        ny -= ry;
+
+                        if (selectable.origin.x != nx || selectable.origin.y != ny)
+                        {
+                            selectable.origin.x = nx;
+                            selectable.origin.y = ny;
+                            selectable.render();
+                        }
+
                     }
                 }
                 else if (this._mouseMode === MouseMode.addArrows)
@@ -677,6 +694,69 @@ namespace UI
             this._arrowsObjCol.push(arrow);
 
         }
+
+        private setSelection(newSel: FlowArrow | FlowBlock | null)
+        {
+            let prevSelected = selectable;
+            selectable = newSel;
+            if (selectable !== prevSelected)
+            {
+                prevSelected?.onUnselect();
+                selectable?.onSelect();
+
+                if (this._arg.propEditor)
+                {
+                    while (this._arg.propEditor.firstElementChild)
+                    {
+                        this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
+                    }
+
+                    let props = selectable?.getPropertyList();
+                    props?.forEach((prop, i) =>
+                    {
+                        let div = document.createElement('div');
+                        let label = document.createElement('label');
+                        let inp = document.createElement('input');
+                        let txt = document.createTextNode(prop.name);
+
+                        if (i === 0)
+                        {
+                            setTimeout(() =>
+                            {
+                                inp.focus();
+                                inp.selectionStart = 0;
+                                inp.selectionEnd = inp.value.length;
+                            }, 100);
+                        }
+
+                        div.appendChild(label);
+                        label.appendChild(txt);
+                        label.appendChild(inp);
+
+                        inp.onkeyup = () =>
+                        {
+                            prop.onSet(inp.value);
+                        }
+                        inp.value = prop.onGet();
+
+                        this._arg.propEditor?.appendChild(div);
+                    });
+                }
+            }
+        }
+
+        setMode(mode: MouseMode)
+        {
+            this._mouseMode = mode;
+            this.setSelection(null);
+        }
+
+        addBlock(block: FlowBlock)
+        {
+            this._blocks.push(block);
+            this._layerBlock.appendChild(block.graphic);
+            block.render();
+        }
     }
 }
 
@@ -691,60 +771,25 @@ fd.rootSVG.style.border = '1px solid black';
 fd.rootSVG.style.width = '100%';
 fd.rootSVG.style.height = '100%';
 
-let button1 = document.getElementById('sw');
-if (button1)
-{
-    button1.onclick = function ()
+let btn_arrow = document.getElementById('btn_arrow');
+if (btn_arrow)
+    btn_arrow.onclick = function ()
     {
-        if (fd._mouseMode != UI.MouseMode.addArrows)
-        {
-            fd._mouseMode = UI.MouseMode.addArrows;
-        }
-        else
-        {
-            fd._mouseMode = UI.MouseMode.moveBlock;
-        }
-
+        fd.setMode(UI.MouseMode.addArrows)
     }
-}
 
-function getBlock(color: string = '#FFFFFF')
-{
-    let block = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
-    let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    block.appendChild(rect);
+let btn_move = document.getElementById('btn_moveblock');
+if (btn_move)
+    btn_move.onclick = function ()
+    {
+        fd.setMode(UI.MouseMode.moveBlock)
+    }
 
-    rect.width.baseVal.value = 100;
-    rect.height.baseVal.value = 100;
-
-    rect.style.fill = color;
-    rect.style.stroke = 'black';
-    rect.style.strokeWidth = '1';
-    rect.x.baseVal.value = 10;
-    rect.y.baseVal.value = 10;
-
-    let txt = document.createElementNS('http://www.w3.org/2000/svg','text');
-    block.appendChild(txt);
-    txt.setAttribute('x','60px');
-    txt.setAttribute('y','60px');
-    txt.style.textAnchor='middle';
-    txt.style.dominantBaseline='middle';
-    
-
-    return new UI.FlowBlock(0, 0, 120, 120, block, [rect],
-        [
-            {
-                name:"Primary text",
-                type:'string',
-                onGet:()=>{return txt.textContent},
-                onSet:(val:any)=>{txt.textContent = val;}
-            }
-        ]
-    );
-}
-
-fd.addBlock(getBlock());
-fd.addBlock(getBlock('red'));
-fd.addBlock(getBlock('blue'));
+let btn_add = document.getElementById('btn_addblock');
+if (btn_add)
+    btn_add.onclick = function ()
+    {
+        fd.addBlock(new UI.FlowBlock());
+    }
 
 
