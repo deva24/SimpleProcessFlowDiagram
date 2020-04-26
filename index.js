@@ -177,7 +177,7 @@ var UI;
     }
     UI.FlowArrow = FlowArrow;
     class FlowBlock {
-        constructor(x, y, w, h, graphic, clickable = []) {
+        constructor(x, y, w, h, graphic, clickable = [], props = []) {
             this.origin = new Drawing.Point(x, y);
             this.size = new Drawing.Point(w, h);
             this.borders = this._getBorderLines();
@@ -188,6 +188,7 @@ var UI;
                 let obj = ele;
                 obj.myhandler = this;
             });
+            this._props = props;
         }
         pointLiesInBlock(x, y) {
             let block = this;
@@ -326,7 +327,7 @@ var UI;
         }
         onUnselect() {
         }
-        getPropertyList() { return []; }
+        getPropertyList() { return this._props; }
         ;
     }
     UI.FlowBlock = FlowBlock;
@@ -471,7 +472,7 @@ if (button1) {
         }
     };
 }
-function getBlock(color = '#00000000') {
+function getBlock(color = '#FFFFFF') {
     let block = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     block.appendChild(rect);
@@ -482,7 +483,20 @@ function getBlock(color = '#00000000') {
     rect.style.strokeWidth = '1';
     rect.x.baseVal.value = 10;
     rect.y.baseVal.value = 10;
-    return new UI.FlowBlock(0, 0, 120, 120, block, [rect]);
+    let txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    block.appendChild(txt);
+    txt.setAttribute('x', '60px');
+    txt.setAttribute('y', '60px');
+    txt.style.textAnchor = 'middle';
+    txt.style.dominantBaseline = 'middle';
+    return new UI.FlowBlock(0, 0, 120, 120, block, [rect], [
+        {
+            name: "Primary text",
+            type: 'string',
+            onGet: () => { return txt.textContent; },
+            onSet: (val) => { txt.textContent = val; }
+        }
+    ]);
 }
 fd.addBlock(getBlock());
 fd.addBlock(getBlock('red'));

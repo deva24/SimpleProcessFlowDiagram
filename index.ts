@@ -270,7 +270,9 @@ namespace UI
         borders: Drawing.LineSeg[];
         center: Drawing.Point;
 
-        constructor(x: number, y: number, w: number, h: number, graphic: SVGGElement, clickable: SVGElementInstance[] = [])
+        private _props:IPropertyDescriptor[];
+
+        constructor(x: number, y: number, w: number, h: number, graphic: SVGGElement, clickable: SVGElementInstance[] = [], props: IPropertyDescriptor[] = [])
         {
             this.origin = new Drawing.Point(x, y);
             this.size = new Drawing.Point(w, h);
@@ -286,6 +288,8 @@ namespace UI
                 let obj = ele as any;
                 obj.myhandler = this;
             })
+
+            this._props = props;
         }
 
         pointLiesInBlock(x: number, y: number)
@@ -488,7 +492,7 @@ namespace UI
 
         }
 
-        getPropertyList() { return [] };
+        getPropertyList() { return this._props };
     }
 
     export class FlowDiagram
@@ -512,9 +516,9 @@ namespace UI
 
             if (arg.targetElement)
                 arg.targetElement.appendChild(this.rootSVG);
-            
-            arg.width?this.rootSVG.setAttribute('width', arg.width):null;
-            arg.height?this.rootSVG.setAttribute('height', arg.height):null;
+
+            arg.width ? this.rootSVG.setAttribute('width', arg.width) : null;
+            arg.height ? this.rootSVG.setAttribute('height', arg.height) : null;
             this._map_namedLayer = {};
             this._blocks = [];
             this._arrowsObjCol = [];
@@ -611,7 +615,7 @@ namespace UI
 
                     if (this._arg.propEditor)
                     {
-                        while(this._arg.propEditor.firstElementChild)
+                        while (this._arg.propEditor.firstElementChild)
                         {
                             this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
                         }
@@ -677,15 +681,15 @@ namespace UI
 }
 
 let fd = new UI.FlowDiagram({
-    width:'100%',
-    height:'100%',
+    width: '100%',
+    height: '100%',
     targetElement: document.getElementById('target') || undefined,
     propEditor: document.getElementById('propeditor') || undefined
 });
 
 fd.rootSVG.style.border = '1px solid black';
-fd.rootSVG.style.width='100%';
-fd.rootSVG.style.height='100%';
+fd.rootSVG.style.width = '100%';
+fd.rootSVG.style.height = '100%';
 
 let button1 = document.getElementById('sw');
 if (button1)
@@ -704,7 +708,7 @@ if (button1)
     }
 }
 
-function getBlock(color: string = '#00000000')
+function getBlock(color: string = '#FFFFFF')
 {
     let block = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
     let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -719,7 +723,24 @@ function getBlock(color: string = '#00000000')
     rect.x.baseVal.value = 10;
     rect.y.baseVal.value = 10;
 
-    return new UI.FlowBlock(0, 0, 120, 120, block, [rect]);
+    let txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    block.appendChild(txt);
+    txt.setAttribute('x','60px');
+    txt.setAttribute('y','60px');
+    txt.style.textAnchor='middle';
+    txt.style.dominantBaseline='middle';
+    
+
+    return new UI.FlowBlock(0, 0, 120, 120, block, [rect],
+        [
+            {
+                name:"Primary text",
+                type:'string',
+                onGet:()=>{return txt.textContent},
+                onSet:(val:any)=>{txt.textContent = val;}
+            }
+        ]
+    );
 }
 
 fd.addBlock(getBlock());
