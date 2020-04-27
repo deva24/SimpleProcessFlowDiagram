@@ -32,6 +32,7 @@ namespace UI.Flow
 
         private _layerBlock: SVGGElement;
         private _layerWire: SVGGElement;
+        private _layerUI: SVGGElement;
 
         private _blocks: FlowBlock[];
         private _arrowsObjCol: FlowArrow[];
@@ -39,9 +40,16 @@ namespace UI.Flow
 
         private _arg: FlowDiagramArg;
         ArrowClass: typeof FlowArrow = FlowArrow;
+        private _rect: SVGRectElement;
 
         constructor(arg: FlowDiagramArg)
         {
+            // style selection rect
+            this._rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            this._rect.style.fill = '#0061ff14';
+            this._rect.style.stroke = '#0061ffcc';
+            this._rect.style.strokeWidth = '0.5px';
+
             this._arg = arg;
             this.rootSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 
@@ -54,13 +62,15 @@ namespace UI.Flow
             this._blocks = [];
             this._arrowsObjCol = [];
 
+            // layer side
             this.createLayer('background');
-
             this._layerWire = this.createLayer('layerWire');
             this._layerBlock = this.createLayer('layerBlock');
+            this._layerUI = this.createLayer('layerUI');
+
             this._mouseMode = MouseMode.moveBlock;
 
-            this.attachBlockEvents();
+            this.attach_BlockEvents();
         }
 
         private createLayer(name: string, ind: number = -1): SVGGElement
@@ -79,11 +89,14 @@ namespace UI.Flow
             return group;
         }
 
-        private attachBlockEvents()
+        private attach_BlockEvents()
         {
             this.rootSVG.onmousedown = e =>
             {
                 let eleInQuestion = e.target as any;
+
+                this._mouseX = e.offsetX;
+                this._mouseY = e.offsetY;
 
                 if (eleInQuestion.myhandler)
                 {
@@ -92,8 +105,6 @@ namespace UI.Flow
                     {
                         if (this._mouseMode === MouseMode.moveBlock)
                         {
-                            this._mouseX = e.x;
-                            this._mouseY = e.y;
                             let blk = handlerObject;
                             this.setSelection(blk);
                             this._selectedBlockX = blk.origin.x;
@@ -126,51 +137,91 @@ namespace UI.Flow
                 }
                 else
                 {
+                    // init selection grid
                     this.setSelection(null);
-                }
+                    this._layerUI.appendChild(this._rect);
 
+                    this._rect.x.baseVal.value = this._mouseX;
+                    this._rect.y.baseVal.value = this._mouseY;
+                    this._rect.width.baseVal.value = 0;
+                    this._rect.height.baseVal.value = 0;
+                }
             }
 
             this.rootSVG.onmousemove = e =>
             {
                 if (this._mouseMode === MouseMode.moveBlock)
                 {
-                    if (e.buttons === 1 && e.button === 0 && this._selectable instanceof FlowBlock)
+                    if (e.buttons === 1 && e.button === 0)
                     {
-                        let dx = e.x - this._mouseX;
-                        let dy = e.y - this._mouseY;
-
-                        let nx = this._selectedBlockX + dx;
-                        let ny = this._selectedBlockY + dy;
-
-                        let hx = this._selectable.size.x / 2;
-                        let hy = this._selectable.size.y / 2;
-
-                        let cx = nx + hx;
-                        let cy = ny + hy;
-
-                        let rounding = 10;
-
-                        let rx = cx - Math.round(cx / rounding) * rounding;
-                        let ry = cy - Math.round(cy / rounding) * rounding;
-
-                        nx -= rx;
-                        ny -= ry;
-
-                        if (this._selectable.origin.x != nx || this._selectable.origin.y != ny)
+                        if (this._selectable instanceof FlowBlock)
                         {
-                            this._selectable.origin.x = nx;
-                            this._selectable.origin.y = ny;
-                            this._selectable.render();
-                        }
+                            let dx = e.offsetX - this._mouseX;
+                            let dy = e.offsetY - this._mouseY;
 
+                            let nx = this._selectedBlockX + dx;
+                            let ny = this._selectedBlockY + dy;
+
+                            let hx = this._selectable.size.x / 2;
+                            let hy = this._selectable.size.y / 2;
+
+                            let cx = nx + hx;
+                            let cy = ny + hy;
+
+                            let rounding = 10;
+
+                            let rx = cx - Math.round(cx / rounding) * rounding;
+                            let ry = cy - Math.round(cy / rounding) * rounding;
+
+                            nx -= rx;
+                            ny -= ry;
+
+                            if (this._selectable.origin.x != nx || this._selectable.origin.y != ny)
+                            {
+                                this._selectable.origin.x = nx;
+                                this._selectable.origin.y = ny;
+                                this._selectable.render();
+                            }
+                        }
+                        else
+                        {
+                            // draw select grid
+                            let x1 = this._mouseX;
+                            let y1 = this._mouseY;
+                            let x2 = e.offsetX;
+                            let y2 = e.offsetY;
+
+                            if (x1 > x2)
+                            {
+                                let x = x2;
+                                x2 = x1;
+                                x1 = x;
+                            }
+
+                            if (y1 > y2)
+                            {
+                                let y = y2;
+                                y2 = y1;
+                                y1 = y;
+                            }
+
+                            this._rect.x.baseVal.value = x1;
+                            this._rect.y.baseVal.value = y1;
+                            this._rect.width.baseVal.value = x2 - x1;
+                            this._rect.height.baseVal.value = y2 - y1;
+                        }
                     }
                 }
                 else if (this._mouseMode === MouseMode.addArrows)
                 {
 
                 }
+            }
 
+            this.rootSVG.onmouseup = e =>
+            {
+                if (this._selectable === null)
+                    this._layerUI.removeChild(this._rect);
             }
         }
 
@@ -266,7 +317,7 @@ namespace UI.Flow
         constructor(from: FlowBlock, to: FlowBlock)
         {
             super(from, to);
-            this.graphics=[];
+            this.graphics = [];
             this.fromBlock = from;
             this.toBlock = to;
             let line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
