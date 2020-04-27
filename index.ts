@@ -361,9 +361,10 @@ namespace UI
             return new Drawing.Point(this.origin.x + this.size.x / 2, this.origin.y + this.size.y / 2);
         }
 
-        pointTo(block2: FlowBlock)
+        pointTo(block2: FlowBlock, typeArrow: typeof FlowArrow)
         {
-            let Arrow1 = new FlowArrow(this, block2);
+            debugger;
+            let Arrow1 = new typeArrow(this, block2);
             this.arrows.push(Arrow1);
             block2.arrows.push(Arrow1);
 
@@ -548,6 +549,7 @@ namespace UI
         private _mouseMode: MouseMode;
 
         private _arg: FlowDiagramArg;
+        ArrowClass: typeof FlowArrow = FlowArrow;
 
         constructor(arg: FlowDiagramArg)
         {
@@ -618,7 +620,7 @@ namespace UI
                             }
                             else if (selBlock && selBlock != selectable && selectable instanceof FlowBlock)
                             {
-                                this.addArrow(selectable, selBlock);
+                                this.addArrow(selectable, selBlock, this.ArrowClass);
                                 this.setSelection(null);
                             }
                             else
@@ -683,16 +685,15 @@ namespace UI
             }
         }
 
-        private addArrow(fromBlock: FlowBlock, toBlock: FlowBlock)
+        private addArrow(fromBlock: FlowBlock, toBlock: FlowBlock, typeArrow: typeof FlowArrow)
         {
-            let arrow = fromBlock.pointTo(toBlock);
+            let arrow = fromBlock.pointTo(toBlock, typeArrow);
             arrow.graphics.forEach(gEle =>
             {
                 this._layerWire.appendChild(gEle);
             });
 
             this._arrowsObjCol.push(arrow);
-
         }
 
         private setSelection(newSel: FlowArrow | FlowBlock | null)
@@ -758,7 +759,139 @@ namespace UI
             block.render();
         }
     }
+
+    export class TestArrow extends UI.FlowArrow
+    {
+        fromBlock: FlowBlock;
+        toBlock: FlowBlock;
+        graphics: any[];
+
+        private _fromPoint2: Drawing.Point;
+        private _toPoint2: Drawing.Point;
+
+        private line12: SVGLineElement;
+        private line22: SVGLineElement;
+        private line32: SVGLineElement;
+        private text2: SVGTextElement;
+
+        constructor(from: FlowBlock, to: FlowBlock)
+        {
+            super(from, to);
+            this.graphics=[];
+            this.fromBlock = from;
+            this.toBlock = to;
+            let line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+
+            text.style.textAnchor = 'middle';
+            text.style.dominantBaseline = 'hanging';
+            this.line12 = line1;
+            this.line22 = line2;
+            this.line32 = line3;
+            this.text2 = text;
+
+            [line1, line2, line3].forEach(line =>
+            {
+                line.style.stroke = 'yellow';
+                line.style.strokeWidth = '2px';
+                (line as any).myhandler = this;
+            });
+
+            this.graphics = [line1, line2, line3, text];
+            this._fromPoint2 = new Drawing.Point(0, 0);
+            this._toPoint2 = new Drawing.Point(0, 0);
+        }
+
+        setPt(point: Drawing.Point, source: FlowBlock)
+        {
+            if (source == this.fromBlock)
+            {
+                this._fromPoint2.x = point.x;
+                this._fromPoint2.y = point.y;
+            }
+            else if (source == this.toBlock)
+            {
+                this._toPoint2.x = point.x;
+                this._toPoint2.y = point.y;
+            }
+            this.render();
+        }
+
+        render()
+        {
+            let fromX: number = this._fromPoint2.x;
+            let fromY: number = this._fromPoint2.y;
+            let toX: number = this._toPoint2.x;
+            let toY: number = this._toPoint2.y;
+            let toDirectAngle: number = Math.atan2(fromY - toY, fromX - toX);
+
+            this._render_draw_arrow2(fromX, fromY, toX, toY, toDirectAngle);
+
+            let text = this.text2;
+            let lineCenter = Drawing.avgPoint([this._fromPoint2, this._toPoint2]);
+
+            let angleDeg = toDirectAngle / Math.PI * 180;
+            if (angleDeg < -90) angleDeg += 180;
+            else if (angleDeg > 90) angleDeg -= 180;
+            text.style.transform = `translate(${lineCenter.x}px, ${lineCenter.y}px) rotate(${angleDeg}deg) translate(0, 5px)`;
+        }
+
+        private _render_draw_arrow2(fromX: number, fromY: number, toX: number, toY: number, toDirectAngle: number)
+        {
+            let line1 = this.line12;
+            let line2 = this.line22;
+            let line3 = this.line32;
+            line1.x1.baseVal.value = fromX;
+            line1.y1.baseVal.value = fromY;
+            line1.x2.baseVal.value = toX;
+            line1.y2.baseVal.value = toY;
+            let x2: number = 0, y2: number = 0, x3: number = 0, y3: number = 0;
+            let delAngle = 30 / 180 * Math.PI;
+            x2 = Math.cos(toDirectAngle - delAngle) * 10;
+            y2 = Math.sin(toDirectAngle - delAngle) * 10;
+            x3 = Math.cos(toDirectAngle + delAngle) * 10;
+            y3 = Math.sin(toDirectAngle + delAngle) * 10;
+            line2.x1.baseVal.value = x2 + toX;
+            line2.y1.baseVal.value = y2 + toY;
+            line2.x2.baseVal.value = toX;
+            line2.y2.baseVal.value = toY;
+            line3.x1.baseVal.value = x3 + toX;
+            line3.y1.baseVal.value = y3 + toY;
+            line3.x2.baseVal.value = toX;
+            line3.y2.baseVal.value = toY;
+        }
+
+        getC2CLine()
+        {
+            return new Drawing.LineSeg(this.fromBlock.center, this.toBlock.center);
+        }
+
+        onSelect()
+        {
+            [this.line12, this.line22, this.line32].forEach(line => { line.style.stroke = 'blue'; });
+        }
+
+        onUnselect()
+        {
+            [this.line12, this.line22, this.line32].forEach(line => { line.style.stroke = 'black'; });
+        }
+
+        getPropertyList(): IPropertyDescriptor[]
+        {
+            return [{
+                name: "Primary Text",
+                type: 'string',
+                onGet: () => { return this.text2.textContent },
+                onSet: (value: any) => { this.text2.textContent = value }
+            }];
+        }
+    }
+
 }
+
+
 
 let fd = new UI.FlowDiagram({
     width: '100%',
@@ -790,6 +923,13 @@ if (btn_add)
     btn_add.onclick = function ()
     {
         fd.addBlock(new UI.FlowBlock());
+    }
+
+let btn_cnga = document.getElementById('btn_cngarrow');
+if (btn_cnga)
+    btn_cnga.onclick = function ()
+    {
+        fd.ArrowClass = UI.TestArrow;
     }
 
 

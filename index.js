@@ -242,8 +242,9 @@ var UI;
         _getCenter() {
             return new Drawing.Point(this.origin.x + this.size.x / 2, this.origin.y + this.size.y / 2);
         }
-        pointTo(block2) {
-            let Arrow1 = new FlowArrow(this, block2);
+        pointTo(block2, typeArrow) {
+            debugger;
+            let Arrow1 = new typeArrow(this, block2);
             this.arrows.push(Arrow1);
             block2.arrows.push(Arrow1);
             this._renderArrows();
@@ -366,6 +367,7 @@ var UI;
     UI.FlowBlock = FlowBlock;
     class FlowDiagram {
         constructor(arg) {
+            this.ArrowClass = FlowArrow;
             this._arg = arg;
             this.rootSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             if (arg.targetElement)
@@ -412,7 +414,7 @@ var UI;
                                 this.setSelection(selBlock);
                             }
                             else if (selBlock && selBlock != selectable && selectable instanceof FlowBlock) {
-                                this.addArrow(selectable, selBlock);
+                                this.addArrow(selectable, selBlock, this.ArrowClass);
                                 this.setSelection(null);
                             }
                             else {
@@ -455,8 +457,8 @@ var UI;
                 }
             };
         }
-        addArrow(fromBlock, toBlock) {
-            let arrow = fromBlock.pointTo(toBlock);
+        addArrow(fromBlock, toBlock, typeArrow) {
+            let arrow = fromBlock.pointTo(toBlock, typeArrow);
             arrow.graphics.forEach(gEle => {
                 this._layerWire.appendChild(gEle);
             });
@@ -509,6 +511,100 @@ var UI;
         }
     }
     UI.FlowDiagram = FlowDiagram;
+    class TestArrow extends UI.FlowArrow {
+        constructor(from, to) {
+            super(from, to);
+            this.graphics = [];
+            this.fromBlock = from;
+            this.toBlock = to;
+            let line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            let text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.style.textAnchor = 'middle';
+            text.style.dominantBaseline = 'hanging';
+            this.line12 = line1;
+            this.line22 = line2;
+            this.line32 = line3;
+            this.text2 = text;
+            [line1, line2, line3].forEach(line => {
+                line.style.stroke = 'yellow';
+                line.style.strokeWidth = '2px';
+                line.myhandler = this;
+            });
+            this.graphics = [line1, line2, line3, text];
+            this._fromPoint2 = new Drawing.Point(0, 0);
+            this._toPoint2 = new Drawing.Point(0, 0);
+        }
+        setPt(point, source) {
+            if (source == this.fromBlock) {
+                this._fromPoint2.x = point.x;
+                this._fromPoint2.y = point.y;
+            }
+            else if (source == this.toBlock) {
+                this._toPoint2.x = point.x;
+                this._toPoint2.y = point.y;
+            }
+            this.render();
+        }
+        render() {
+            let fromX = this._fromPoint2.x;
+            let fromY = this._fromPoint2.y;
+            let toX = this._toPoint2.x;
+            let toY = this._toPoint2.y;
+            let toDirectAngle = Math.atan2(fromY - toY, fromX - toX);
+            this._render_draw_arrow2(fromX, fromY, toX, toY, toDirectAngle);
+            let text = this.text2;
+            let lineCenter = Drawing.avgPoint([this._fromPoint2, this._toPoint2]);
+            let angleDeg = toDirectAngle / Math.PI * 180;
+            if (angleDeg < -90)
+                angleDeg += 180;
+            else if (angleDeg > 90)
+                angleDeg -= 180;
+            text.style.transform = `translate(${lineCenter.x}px, ${lineCenter.y}px) rotate(${angleDeg}deg) translate(0, 5px)`;
+        }
+        _render_draw_arrow2(fromX, fromY, toX, toY, toDirectAngle) {
+            let line1 = this.line12;
+            let line2 = this.line22;
+            let line3 = this.line32;
+            line1.x1.baseVal.value = fromX;
+            line1.y1.baseVal.value = fromY;
+            line1.x2.baseVal.value = toX;
+            line1.y2.baseVal.value = toY;
+            let x2 = 0, y2 = 0, x3 = 0, y3 = 0;
+            let delAngle = 30 / 180 * Math.PI;
+            x2 = Math.cos(toDirectAngle - delAngle) * 10;
+            y2 = Math.sin(toDirectAngle - delAngle) * 10;
+            x3 = Math.cos(toDirectAngle + delAngle) * 10;
+            y3 = Math.sin(toDirectAngle + delAngle) * 10;
+            line2.x1.baseVal.value = x2 + toX;
+            line2.y1.baseVal.value = y2 + toY;
+            line2.x2.baseVal.value = toX;
+            line2.y2.baseVal.value = toY;
+            line3.x1.baseVal.value = x3 + toX;
+            line3.y1.baseVal.value = y3 + toY;
+            line3.x2.baseVal.value = toX;
+            line3.y2.baseVal.value = toY;
+        }
+        getC2CLine() {
+            return new Drawing.LineSeg(this.fromBlock.center, this.toBlock.center);
+        }
+        onSelect() {
+            [this.line12, this.line22, this.line32].forEach(line => { line.style.stroke = 'blue'; });
+        }
+        onUnselect() {
+            [this.line12, this.line22, this.line32].forEach(line => { line.style.stroke = 'black'; });
+        }
+        getPropertyList() {
+            return [{
+                    name: "Primary Text",
+                    type: 'string',
+                    onGet: () => { return this.text2.textContent; },
+                    onSet: (value) => { this.text2.textContent = value; }
+                }];
+        }
+    }
+    UI.TestArrow = TestArrow;
 })(UI || (UI = {}));
 let fd = new UI.FlowDiagram({
     width: '100%',
@@ -533,4 +629,9 @@ let btn_add = document.getElementById('btn_addblock');
 if (btn_add)
     btn_add.onclick = function () {
         fd.addBlock(new UI.FlowBlock());
+    };
+let btn_cnga = document.getElementById('btn_cngarrow');
+if (btn_cnga)
+    btn_cnga.onclick = function () {
+        fd.ArrowClass = UI.TestArrow;
     };
