@@ -23,8 +23,7 @@ namespace UI.Flow
     {
         private _mouseX: number = 0;
         private _mouseY: number = 0;
-        private _selectedBlockX: number = 0;
-        private _selectedBlockY: number = 0;
+
         private _selectable: FlowBlock | FlowArrow | null = null;
 
         rootSVG: SVGElement;
@@ -107,8 +106,6 @@ namespace UI.Flow
                         {
                             let blk = handlerObject;
                             this.setSelection(blk);
-                            this._selectedBlockX = blk.origin.x;
-                            this._selectedBlockY = blk.origin.y;
                         }
                         else if (this._mouseMode === MouseMode.addArrows)
                         {
@@ -159,27 +156,37 @@ namespace UI.Flow
                             let dx = e.offsetX - this._mouseX;
                             let dy = e.offsetY - this._mouseY;
 
-                            let nx = this._selectedBlockX + dx;
-                            let ny = this._selectedBlockY + dy;
-
-                            let hx = this._selectable.size.x / 2;
-                            let hy = this._selectable.size.y / 2;
-
-                            let cx = nx + hx;
-                            let cy = ny + hy;
-
-                            let rounding = 10;
-
-                            let rx = cx - Math.round(cx / rounding) * rounding;
-                            let ry = cy - Math.round(cy / rounding) * rounding;
-
-                            nx -= rx;
-                            ny -= ry;
-
-                            if (this._selectable.origin.x != nx || this._selectable.origin.y != ny)
+                            if (Math.abs(dx) > 10)
                             {
-                                this._selectable.origin.x = nx;
-                                this._selectable.origin.y = ny;
+                                let sign = Math.abs(dx) / dx;
+                                let gdx = sign * (Math.abs(dx) - 10)
+                                this._mouseX = e.offsetX - gdx;
+                                dx = sign * 10;
+                            }
+                            else
+                            {
+                                dx = 0;
+                            }
+
+                            if (Math.abs(dy) > 10)
+                            {
+                                let sign = Math.abs(dy) / dy;
+                                let gdy = sign * (Math.abs(dy) - 10)
+                                this._mouseY = e.offsetY - gdy;
+                                dy = sign * 10;
+                            }
+                            else
+                            {
+                                dy = 0;
+                            }
+
+
+                            if (dx !== 0 || dy !== 0)
+                            {
+
+                                this._selectable.origin.x += dx;
+                                this._selectable.origin.y += dy;
+
                                 this._selectable.render();
                             }
                         }
@@ -228,7 +235,7 @@ namespace UI.Flow
                     let y = this._rect.y.baseVal.value;
                     let w = this._rect.width.baseVal.value;
                     let h = this._rect.height.baseVal.value;
-                    
+
                     let selectedBlocks = this._blocks.filter(blk => { return blk.blockInRect(x, y, w, h) });
                     this.setSelection(selectedBlocks[0]);
                 }
