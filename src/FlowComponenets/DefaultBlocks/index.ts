@@ -15,6 +15,7 @@ class FlowBlock implements Int.Selectable
     center: DrawingUtils.Point;
 
     private _props: Int.PropertyDescriptor[];
+    private _rect : SVGRectElement;
 
     constructor()
     {
@@ -34,13 +35,16 @@ class FlowBlock implements Int.Selectable
 
         let block = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
         this.graphic = block;
+        let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        this._rect = rect;
         this._setGraphic();
     }
-
+    
     private _setGraphic()
     {
         let block = this.graphic;
-        let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        
+        let rect = this._rect;
         block.appendChild(rect);
 
         rect.width.baseVal.value = 100;
@@ -76,45 +80,9 @@ class FlowBlock implements Int.Selectable
         ]
     }
 
-    pointLiesInBlock(x: number, y: number)
-    {
-        let block = this;
-        return x >= block.origin.x && y >= block.origin.y && x <= block.origin.x + block.size.x && y <= block.origin.y + block.size.y;
-    }
-
-    render()
-    {
-        this.borders = this._getBorderLines();
-        this.center = this._getCenter();
-        let block = this.graphic;
-        if (block.transform.baseVal.numberOfItems == 0)
-        {
-            block.setAttribute('transform', `translate(${this.origin.x},${this.origin.y})`)
-
-        }
-        else
-        {
-            block.transform.baseVal.getItem(0).setTranslate(this.origin.x, this.origin.y);
-        }
-
-        this._renderArrows();
-    }
-
     private _getCenter()
     {
         return new DrawingUtils.Point(this.origin.x + this.size.x / 2, this.origin.y + this.size.y / 2);
-    }
-
-    pointTo(block2: FlowBlock, typeArrow: typeof FlowArrow)
-    {
-        debugger;
-        let Arrow1 = new typeArrow(this, block2);
-        this.arrows.push(Arrow1);
-        block2.arrows.push(Arrow1);
-
-        this._renderArrows();
-        block2._renderArrows();
-        return Arrow1
     }
 
     private _renderArrows(sender: FlowBlock = this)
@@ -267,14 +235,51 @@ class FlowBlock implements Int.Selectable
         return ret;
     }
 
+    blockInRect(x1: number, y1: number, width: number, height: number)
+    {
+        let x = this.center.x;
+        let y = this.center.y;
+        return x >= x1 && y >= y1 && x <= x1 + width && y <= y1 + height;
+    }
+
+    render()
+    {
+        this.borders = this._getBorderLines();
+        this.center = this._getCenter();
+        let block = this.graphic;
+        if (block.transform.baseVal.numberOfItems == 0)
+        {
+            block.setAttribute('transform', `translate(${this.origin.x},${this.origin.y})`)
+
+        }
+        else
+        {
+            block.transform.baseVal.getItem(0).setTranslate(this.origin.x, this.origin.y);
+        }
+
+        this._renderArrows();
+    }
+
+    pointTo(block2: FlowBlock, typeArrow: typeof FlowArrow)
+    {
+        debugger;
+        let Arrow1 = new typeArrow(this, block2);
+        this.arrows.push(Arrow1);
+        block2.arrows.push(Arrow1);
+
+        this._renderArrows();
+        block2._renderArrows();
+        return Arrow1
+    }
+
     onSelect()
     {
-
+        this._rect.style.stroke='blue';
     }
 
     onUnselect()
     {
-
+        this._rect.style.stroke='black';
     }
 
     getPropertyList() { return this._props };
