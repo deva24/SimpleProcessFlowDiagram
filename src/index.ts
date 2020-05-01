@@ -1,7 +1,7 @@
 import DrawingUtils from './Utils/drawing';
 import FlowArrow from './FlowComponenets/DefaultArrows';
 import FlowBlock from './FlowComponenets/DefaultBlocks';
-import Int from './FlowComponenets/interface'
+import Int, { Interfaces } from './FlowComponenets/interface'
 
 namespace UI.Flow
 {
@@ -24,7 +24,7 @@ namespace UI.Flow
         private _mouseX: number = 0;
         private _mouseY: number = 0;
 
-        private _selectable: FlowBlock | FlowArrow | null = null;
+        private _selectable: Interfaces.Selectable[] = [];
 
         rootSVG: SVGElement;
         private _map_namedLayer: { [name: string]: SVGGElement };
@@ -34,7 +34,7 @@ namespace UI.Flow
         private _layerUI: SVGGElement;
 
         private _blocks: FlowBlock[];
-        private _arrowsObjCol: FlowArrow[];
+        private _arrows: FlowArrow[];
         private _mouseMode: MouseMode;
 
         private _arg: FlowDiagramArg;
@@ -57,9 +57,10 @@ namespace UI.Flow
 
             arg.width ? this.rootSVG.setAttribute('width', arg.width) : null;
             arg.height ? this.rootSVG.setAttribute('height', arg.height) : null;
+            this.rootSVG.style.userSelect='none';
             this._map_namedLayer = {};
             this._blocks = [];
-            this._arrowsObjCol = [];
+            this._arrows = [];
 
             // layer side
             this.createLayer('background');
@@ -102,40 +103,44 @@ namespace UI.Flow
                     let handlerObject = eleInQuestion.myhandler;
                     if (handlerObject instanceof FlowBlock)
                     {
-                        if (this._mouseMode === MouseMode.moveBlock)
+                        let selectedBlockAlreadySelected = this._selectable.indexOf(handlerObject) >= 0;
+
+                        if (this._mouseMode === MouseMode.moveBlock && !selectedBlockAlreadySelected)
                         {
                             let blk = handlerObject;
-                            this.setSelection(blk);
+                            this.setSelection([blk]);
                         }
                         else if (this._mouseMode === MouseMode.addArrows)
                         {
                             let selBlock: FlowBlock = handlerObject;
 
-                            if (this._selectable === null)
+                            let primarySelected = this._selectable[0];
+
+                            if (primarySelected === null)
                             {
-                                this.setSelection(selBlock);
+                                this.setSelection([selBlock]);
                             }
-                            else if (selBlock && selBlock != this._selectable && this._selectable instanceof FlowBlock)
+                            else if (selBlock && selBlock != primarySelected && primarySelected instanceof FlowBlock)
                             {
-                                this.addArrow(this._selectable, selBlock, this.ArrowClass);
-                                this.setSelection(null);
+                                this.addArrow(primarySelected, selBlock, this.ArrowClass);
+                                this.setSelection([]);
                             }
                             else
                             {
-                                this.setSelection(selBlock);
+                                this.setSelection([selBlock]);
                             }
                         }
                     }
 
                     if (handlerObject instanceof FlowArrow)
                     {
-                        this.setSelection(eleInQuestion.myhandler);
+                        this.setSelection([eleInQuestion.myhandler]);
                     }
                 }
                 else
                 {
                     // init selection grid
-                    this.setSelection(null);
+                    this.setSelection([]);
                     this._layerUI.appendChild(this._rect);
 
                     this._rect.x.baseVal.value = this._mouseX;
@@ -151,43 +156,30 @@ namespace UI.Flow
                 {
                     if (e.buttons === 1 && e.button === 0)
                     {
-                        if (this._selectable instanceof FlowBlock)
+                        if (this._selectable.length > 0)
                         {
                             let dx = e.offsetX - this._mouseX;
                             let dy = e.offsetY - this._mouseY;
 
-                            if (Math.abs(dx) > 10)
-                            {
-                                let sign = Math.abs(dx) / dx;
-                                let gdx = sign * (Math.abs(dx) - 10)
-                                this._mouseX = e.offsetX - gdx;
-                                dx = sign * 10;
-                            }
-                            else
-                            {
-                                dx = 0;
-                            }
+                            let factor = 20;
 
-                            if (Math.abs(dy) > 10)
-                            {
-                                let sign = Math.abs(dy) / dy;
-                                let gdy = sign * (Math.abs(dy) - 10)
-                                this._mouseY = e.offsetY - gdy;
-                                dy = sign * 10;
-                            }
-                            else
-                            {
-                                dy = 0;
-                            }
-
+                            dx = Math.floor(dx / factor) * factor;
+                            dy = Math.floor(dy / factor) * factor;
 
                             if (dx !== 0 || dy !== 0)
                             {
+                                this._mouseX += dx;
+                                this._mouseY += dy;
+                                this._selectable.forEach(sel =>
+                                {
+                                    if (sel instanceof FlowBlock)
+                                    {
+                                        sel.origin.x += dx;
+                                        sel.origin.y += dy;
 
-                                this._selectable.origin.x += dx;
-                                this._selectable.origin.y += dy;
-
-                                this._selectable.render();
+                                        sel.render();
+                                    }
+                                });
                             }
                         }
                         else
@@ -228,16 +220,17 @@ namespace UI.Flow
             this.rootSVG.onmouseup = e =>
             {
                 // if selection ui was rendered
-                if (this._selectable === null)
+                if (this._selectable.length === 0)
                 {
-                    this._layerUI.removeChild(this._rect);
+                    if(this._rect.parentElement)
+                        this._layerUI.removeChild(this._rect);
                     let x = this._rect.x.baseVal.value;
                     let y = this._rect.y.baseVal.value;
                     let w = this._rect.width.baseVal.value;
                     let h = this._rect.height.baseVal.value;
 
                     let selectedBlocks = this._blocks.filter(blk => { return blk.blockInRect(x, y, w, h) });
-                    this.setSelection(selectedBlocks[0]);
+                    this.setSelection(selectedBlocks);
                 }
             }
         }
@@ -250,63 +243,84 @@ namespace UI.Flow
                 this._layerWire.appendChild(gEle);
             });
 
-            this._arrowsObjCol.push(arrow);
+            this._arrows.push(arrow);
         }
 
-        private setSelection(newSel: FlowArrow | FlowBlock | null)
+        private setSelection(newSel: Interfaces.Selectable[])
         {
-            let prevSelected = this._selectable;
+            let propsDescribed: Interfaces.PropertyDescriptor[][] = [];
+            this._selectable.forEach(sel => { sel.onUnselect() });
             this._selectable = newSel;
-            if (this._selectable !== prevSelected)
-            {
-                prevSelected?.onUnselect();
-                this._selectable?.onSelect();
+            this._selectable.forEach((sel, i) => { sel.onSelect(); propsDescribed[i] = sel.getPropertyList() });
 
-                if (this._arg.propEditor)
+            if (this._arg.propEditor)
+            {
+                let propNameMap: { [key: string]: Interfaces.PropertyDescriptor[] } = {};
+                let commonProps: Interfaces.PropertyDescriptor[] = [];
+
+                propsDescribed.forEach(props =>
                 {
-                    while (this._arg.propEditor.firstElementChild)
+                    props.forEach(prop =>
                     {
-                        this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
+                        if (propNameMap[prop.name] === undefined) propNameMap[prop.name] = [];
+                        propNameMap[prop.name].push(prop);
+                    })
+                });
+
+                Object.keys(propNameMap).forEach(name =>
+                {
+                    commonProps.push({
+                        name: name,
+                        onGet: () => { return propNameMap[name][0].onGet() },
+                        type: 'string',
+                        onSet: (val) => { propNameMap[name].forEach(prop => { prop.onSet(val); }) },
+                    })
+                });
+
+
+                while (this._arg.propEditor.firstElementChild)
+                {
+                    this._arg.propEditor.removeChild(this._arg.propEditor.firstElementChild);
+                }
+
+                let props = commonProps;
+                props.forEach((prop, i) =>
+                {
+                    let div = document.createElement('div');
+                    let label = document.createElement('label');
+                    let inp = document.createElement('input');
+                    let txt = document.createTextNode(prop.name);
+
+                    if (i === 0)
+                    {
+                        setTimeout(() =>
+                        {
+                            inp.focus();
+                            inp.selectionStart = 0;
+                            inp.selectionEnd = inp.value.length;
+                        }, 100);
                     }
 
-                    let props = this._selectable?.getPropertyList();
-                    props?.forEach((prop, i) =>
+                    div.appendChild(label);
+                    label.appendChild(txt);
+                    label.appendChild(inp);
+
+                    inp.onkeyup = () =>
                     {
-                        let div = document.createElement('div');
-                        let label = document.createElement('label');
-                        let inp = document.createElement('input');
-                        let txt = document.createTextNode(prop.name);
+                        prop.onSet(inp.value);
+                    }
+                    inp.value = prop.onGet();
 
-                        if (i === 0)
-                        {
-                            setTimeout(() =>
-                            {
-                                inp.focus();
-                                inp.selectionStart = 0;
-                                inp.selectionEnd = inp.value.length;
-                            }, 100);
-                        }
-
-                        div.appendChild(label);
-                        label.appendChild(txt);
-                        label.appendChild(inp);
-
-                        inp.onkeyup = () =>
-                        {
-                            prop.onSet(inp.value);
-                        }
-                        inp.value = prop.onGet();
-
-                        this._arg.propEditor?.appendChild(div);
-                    });
-                }
+                    this._arg.propEditor?.appendChild(div);
+                });
             }
+
         }
 
         setMode(mode: MouseMode)
         {
             this._mouseMode = mode;
-            this.setSelection(null);
+            this.setSelection([]);
         }
 
         addBlock(block: FlowBlock)

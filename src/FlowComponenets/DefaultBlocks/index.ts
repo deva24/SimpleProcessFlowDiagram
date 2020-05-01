@@ -262,7 +262,6 @@ class FlowBlock implements Int.Selectable
 
     pointTo(block2: FlowBlock, typeArrow: typeof FlowArrow)
     {
-        debugger;
         let Arrow1 = new typeArrow(this, block2);
         this.arrows.push(Arrow1);
         block2.arrows.push(Arrow1);
