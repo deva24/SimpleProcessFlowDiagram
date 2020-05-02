@@ -1,7 +1,7 @@
-import DrawingUtils from './Utils/drawing';
 import FlowArrow from './FlowComponenets/DefaultArrows';
 import FlowBlock from './FlowComponenets/DefaultBlocks';
-import Int, { Interfaces } from './FlowComponenets/interface'
+import Int from './FlowComponenets/interface'
+import reGrid from './UIComponents/Grid';
 
 namespace UI.Flow
 {
@@ -23,7 +23,7 @@ namespace UI.Flow
     {
         private _mouseX: number = 0;
         private _mouseY: number = 0;
-        private _selectable: Interfaces.Selectable[] = [];
+        private _selectable: Int.Selectable[] = [];
         private _map_namedLayer: { [name: string]: SVGGElement };
 
         private _layerBlock: SVGGElement;
@@ -246,17 +246,17 @@ namespace UI.Flow
             return arrow;
         }
 
-        private setSelection(newSel: Interfaces.Selectable[])
+        private setSelection(newSel: Int.Selectable[])
         {
-            let propsDescribed: Interfaces.PropertyDescriptor[][] = [];
+            let propsDescribed: Int.PropertyDescriptor[][] = [];
             this._selectable.forEach(sel => { sel.onUnselect() });
             this._selectable = newSel;
             this._selectable.forEach((sel, i) => { sel.onSelect(); propsDescribed[i] = sel.getPropertyList() });
 
             if (this._arg.propEditor)
             {
-                let propNameMap: { [key: string]: Interfaces.PropertyDescriptor[] } = {};
-                let commonProps: Interfaces.PropertyDescriptor[] = [];
+                let propNameMap: { [key: string]: Int.PropertyDescriptor[] } = {};
+                let commonProps: Int.PropertyDescriptor[] = [];
 
                 propsDescribed.forEach(props =>
                 {
@@ -356,12 +356,12 @@ namespace UI.Flow
                 let toBlock = blockMap[arrowJSON.target];
 
 
-                if(fromBlock && toBlock)
+                if (fromBlock && toBlock)
                 {
-                    let arrowObj = this.addArrow(fromBlock,toBlock,this.ArrowClass);
+                    let arrowObj = this.addArrow(fromBlock, toBlock, this.ArrowClass);
                     arrowObj.setSaveObj(arrowJSON);
                 }
-                
+
             })
         }
 
@@ -380,6 +380,16 @@ namespace UI.Flow
         }
     }
 }
+
+let mainDiv = document.getElementById('main');
+if (mainDiv === null) throw "Unexpected null";
+
+reGrid(mainDiv, {
+    rows: [-1],
+    cols: [100, -1, 300],
+    col_seperator: 3,
+    row_seperator: 3
+});
 
 let fd = new UI.Flow.FlowDiagram({
     width: '100%',
