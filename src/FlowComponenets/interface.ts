@@ -15,6 +15,8 @@ export namespace Interfaces
         onUnselect: Function;
 
         getPropertyList: () => PropertyDescriptor[];
+        getSaveObj:()=>any;
+        setSaveObj:(val:any)=>void;
     }
 }
 

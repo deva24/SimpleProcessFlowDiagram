@@ -23,10 +23,7 @@ namespace UI.Flow
     {
         private _mouseX: number = 0;
         private _mouseY: number = 0;
-
         private _selectable: Interfaces.Selectable[] = [];
-
-        rootSVG: SVGElement;
         private _map_namedLayer: { [name: string]: SVGGElement };
 
         private _layerBlock: SVGGElement;
@@ -38,8 +35,10 @@ namespace UI.Flow
         private _mouseMode: MouseMode;
 
         private _arg: FlowDiagramArg;
-        ArrowClass: typeof FlowArrow = FlowArrow;
         private _rect: SVGRectElement;
+
+        rootSVG: SVGElement;
+        ArrowClass: typeof FlowArrow = FlowArrow;
 
         constructor(arg: FlowDiagramArg)
         {
@@ -57,7 +56,7 @@ namespace UI.Flow
 
             arg.width ? this.rootSVG.setAttribute('width', arg.width) : null;
             arg.height ? this.rootSVG.setAttribute('height', arg.height) : null;
-            this.rootSVG.style.userSelect='none';
+            this.rootSVG.style.userSelect = 'none';
             this._map_namedLayer = {};
             this._blocks = [];
             this._arrows = [];
@@ -222,7 +221,7 @@ namespace UI.Flow
                 // if selection ui was rendered
                 if (this._selectable.length === 0)
                 {
-                    if(this._rect.parentElement)
+                    if (this._rect.parentElement)
                         this._layerUI.removeChild(this._rect);
                     let x = this._rect.x.baseVal.value;
                     let y = this._rect.y.baseVal.value;
@@ -244,6 +243,7 @@ namespace UI.Flow
             });
 
             this._arrows.push(arrow);
+            return arrow;
         }
 
         private setSelection(newSel: Interfaces.Selectable[])
@@ -317,6 +317,54 @@ namespace UI.Flow
 
         }
 
+        getJSON()
+        {
+            let blocks = this._blocks.map(blk =>
+            {
+                return blk.getSaveObj();
+            });
+
+            let arrows = this._arrows.map(arrow =>
+            {
+                return arrow.getSaveObj();
+            });
+
+            return { type: "FlowDiagram", v: "0.1", "0.1": { blocks, arrows } }
+        }
+
+        setJSON(obj: any)
+        {
+            let instructions = obj['0.1'];
+
+            let blockMap: { [id: number]: FlowBlock } = {};
+
+            instructions.blocks.forEach((blockJSON: any) =>
+            {
+                let blockObj = new FlowBlock();
+                this.addBlock(blockObj);
+                blockObj.setSaveObj(blockJSON);
+
+                blockMap[blockJSON.id] = blockObj;
+            });
+
+            instructions.arrows.forEach((arrowJSON: any) =>
+            {
+                let fromBlockId = arrowJSON.source;
+                let toBlockId = arrowJSON.target;
+
+                let fromBlock = blockMap[arrowJSON.source];
+                let toBlock = blockMap[arrowJSON.target];
+
+
+                if(fromBlock && toBlock)
+                {
+                    let arrowObj = this.addArrow(fromBlock,toBlock,this.ArrowClass);
+                    arrowObj.setSaveObj(arrowJSON);
+                }
+                
+            })
+        }
+
         setMode(mode: MouseMode)
         {
             this._mouseMode = mode;
@@ -325,6 +373,7 @@ namespace UI.Flow
 
         addBlock(block: FlowBlock)
         {
+            block.id = this._blocks.length;
             this._blocks.push(block);
             this._layerBlock.appendChild(block.graphic);
             block.render();
@@ -364,4 +413,46 @@ if (btn_add)
         fd.addBlock(new FlowBlock());
     }
 
+let a = document.createElement('a');
+let btn_save = document.getElementById('btn_save');
+if (btn_save)
+    btn_save.onclick = function ()
+    {
+        debugger;
+        let mainJSON = JSON.stringify(fd.getJSON());
+        let blob1 = new Blob([mainJSON], { type: 'application/json' });
+
+        let url1 = URL.createObjectURL(blob1);
+        a.href = url1;
+        a.download = 'flow_diagram.json';
+        a.click();
+    }
+
+
+
+let btn_load = document.getElementById('btn_load');
+if (btn_load)
+    btn_load.onclick = function ()
+    {
+        let file_inp = document.createElement('input');
+        file_inp.type = 'file';
+        file_inp.click();
+        file_inp.onchange = function ()
+        {
+            if (file_inp.files && file_inp.files.length > 0)
+            {
+                let fr = new FileReader();
+                fr.onload = function ()
+                {
+                    if (typeof fr.result === 'string')
+                    {
+                        let obj = JSON.parse(fr.result);
+                        debugger;
+                        fd.setJSON(obj);
+                    }
+                }
+                fr.readAsText(file_inp.files[0]);
+            }
+        }
+    }
 

@@ -15,10 +15,12 @@ class FlowBlock implements Int.Selectable
     center: DrawingUtils.Point;
 
     private _props: Int.PropertyDescriptor[];
-    private _rect : SVGRectElement;
+    private _rect: SVGRectElement;
+    id: number;
 
     constructor()
     {
+        this.id = 0;
         let x: number = 0;
         let y: number = 0;
         let w: number = 120;
@@ -39,11 +41,11 @@ class FlowBlock implements Int.Selectable
         this._rect = rect;
         this._setGraphic();
     }
-    
+
     private _setGraphic()
     {
         let block = this.graphic;
-        
+
         let rect = this._rect;
         block.appendChild(rect);
 
@@ -273,15 +275,54 @@ class FlowBlock implements Int.Selectable
 
     onSelect()
     {
-        this._rect.style.stroke='blue';
+        this._rect.style.stroke = 'blue';
     }
 
     onUnselect()
     {
-        this._rect.style.stroke='black';
+        this._rect.style.stroke = 'black';
     }
 
     getPropertyList() { return this._props };
+
+    getSaveObj()
+    {
+        let ret = {
+            id: this.id,
+            x: this.origin.x,
+            y: this.origin.y,
+        } as any;
+
+        let props = this.getPropertyList().map(prop => ({ key: prop.name, value: prop.onGet() })).filter(prop => { return typeof prop.value === 'string' && prop.value.trim() !== '' })
+        if (props.length > 0)
+            ret.props = props;
+
+        return ret;
+    }
+
+    setSaveObj(val: any)
+    {
+        this.id = val.id;
+        this.origin.x = val.x;
+        this.origin.y = val.y;
+
+        if (val.props)
+        {
+            let propIDMap : {[key:string]:Int.PropertyDescriptor} = {}
+
+            this.getPropertyList().forEach(prop=>{
+                propIDMap[prop.name] = prop;
+            });
+
+            val.props.forEach((prop:{key:string,value:string}) =>
+            {
+                propIDMap[prop.key].onSet(prop.value);
+            });
+        }
+
+        this.render();
+
+    }
 }
 
 export default FlowBlock

@@ -127,6 +127,37 @@ class FlowArrow implements Interfaces.Selectable
             onSet: (value: any) => { this.text.textContent = value }
         }];
     }
+
+    getSaveObj()
+    {
+        let ret = {
+            source:this.fromBlock.id,
+            target:this.toBlock.id
+        } as any;
+
+        let props = this.getPropertyList().map(prop => ({ key: prop.name, value: prop.onGet() })).filter(prop => { return typeof prop.value === 'string' && prop.value.trim() !== '' })
+        if (props.length > 0)
+            ret.props = props;
+
+            return ret;
+    }
+
+    setSaveObj(val:any)
+    {
+        if (val.props)
+        {
+            let propIDMap : {[key:string]:Interfaces.PropertyDescriptor} = {}
+
+            this.getPropertyList().forEach(prop=>{
+                propIDMap[prop.name] = prop;
+            });
+
+            val.props.forEach((prop:{key:string,value:string}) =>
+            {
+                propIDMap[prop.key].onSet(prop.value);
+            });
+        }
+    }
 }
 
 export default FlowArrow
