@@ -2,6 +2,7 @@ import FlowArrow from './FlowComponenets/DefaultArrows';
 import FlowBlock from './FlowComponenets/DefaultBlocks';
 import Int from './FlowComponenets/interface'
 import reGrid from './UIComponents/Grid';
+import renderSVG from './Utils/svg';
 
 namespace UI.Flow
 {
@@ -37,7 +38,7 @@ namespace UI.Flow
         private _arg: FlowDiagramArg;
         private _rect: SVGRectElement;
 
-        rootSVG: SVGElement;
+        rootSVG: SVGSVGElement;
         ArrowClass: typeof FlowArrow = FlowArrow;
 
         constructor(arg: FlowDiagramArg)
@@ -436,6 +437,25 @@ if (btn_save)
         a.href = url1;
         a.download = 'flow_diagram.json';
         a.click();
+    }
+
+let btn_export = document.getElementById('btn_export');
+if (btn_export)
+    btn_export.onclick = function ()
+    {   
+        
+        fd.rootSVG.setAttribute('width',fd.rootSVG.clientWidth + 'px');
+        fd.rootSVG.setAttribute('height',fd.rootSVG.clientHeight + 'px');
+
+        renderSVG(fd.rootSVG,(url1)=>{
+            a.href = url1;
+            a.download = 'flow_diagram.png';
+            a.click();
+
+            fd.rootSVG.removeAttribute('width');
+            fd.rootSVG.removeAttribute('height');
+        })
+
     }
 
 
